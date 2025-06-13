@@ -3,9 +3,10 @@ import { UrlService } from './url.service';
 import { UrlController } from './url.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UrlEntity } from './entity/url.entity';
+import { ViewEntity } from './entity/view.entity';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([UrlEntity])],
+	imports: [TypeOrmModule.forFeature([UrlEntity, ViewEntity])],
 	controllers: [UrlController],
 	providers: [UrlService],
 })

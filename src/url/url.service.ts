@@ -4,14 +4,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { UrlEntity } from './entity/url.entity';
 import { Repository } from 'typeorm';
 import { UpdateUrlDto } from './dto/update-url.dto';
-import EventEmitter2 from 'eventemitter2';
-import { OnEvent } from '@nestjs/event-emitter';
+import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
+import { ViewEntity } from './entity/view.entity';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class UrlService {
 	constructor(
 		@InjectRepository(UrlEntity)
 		private readonly urlRepository: Repository<UrlEntity>,
+		@InjectRepository(ViewEntity)
+		private readonly viewRepository: Repository<ViewEntity>,
 		private readonly eventEmitter: EventEmitter2,
 	) {}
 
@@ -47,13 +50,14 @@ export class UrlService {
 
 		const url = this.urlRepository.create({
 			...dto,
+			originalUrl: dto.url,
 			shortUrl,
 		});
 
 		return this.urlRepository.save(url);
 	}
 
-	async getShortUrl(shortUrl: string) {
+	async getShortUrl(shortUrl: string, ip?: string) {
 		const url = await this.urlRepository.findOne({
 			where: { shortUrl },
 		});
@@ -61,21 +65,21 @@ export class UrlService {
 			throw new BadRequestException('Short URL not found');
 		}
 
-		this.eventEmitter.emit('url.accessed', url);
+		this.eventEmitter.emit('url.accessed', url, ip);
 		return url.originalUrl;
 	}
-
 	async update(id: string, dto: UpdateUrlDto) {
-		const url = await this.urlRepository.findOne({ where: { id } });
+		const url = await this.urlRepository.findOne({
+			where: { id: new ObjectId(id) },
+		});
 		if (!url) {
 			throw new BadRequestException('URL not found');
 		}
-
 		if (dto.customShortUrl) {
 			const findshort = await this.urlRepository.findOne({
 				where: { shortUrl: dto.customShortUrl },
 			});
-			if (findshort && findshort.id !== id)
+			if (findshort && findshort.id.toString() !== id)
 				throw new BadRequestException(
 					'Custom short URL already exists',
 				);
@@ -83,11 +87,13 @@ export class UrlService {
 		}
 
 		this.urlRepository.merge(url, dto);
+		delete url.views;
 		return this.urlRepository.save(url);
 	}
-
 	async delete(id: string) {
-		const url = await this.urlRepository.findOne({ where: { id } });
+		const url = await this.urlRepository.findOne({
+			where: { id: new ObjectId(id) },
+		});
 		if (!url) {
 			throw new BadRequestException('URL not found');
 		}
@@ -98,20 +104,35 @@ export class UrlService {
 	async getAllUrls() {
 		return this.urlRepository.find();
 	}
-	async getUrlById(id: string) {
-		const url = await this.urlRepository.findOne({ where: { id } });
+	async getUrlByShortUrl(shortUrl: string) {
+		const url = await this.urlRepository.findOne({
+			where: { shortUrl },
+		});
 		if (!url) {
 			throw new BadRequestException('URL not found');
 		}
-		return url;
+		const newUrl = {
+			...url,
+			views: url.views.length || 0,
+			viewsUniqui: url.views.reduce((acc, view) => {
+				if (!acc.includes(view.ip)) {
+					acc.push(view.ip);
+				}
+				return acc;
+			}, [] as string[]).length,
+		};
+		return newUrl;
 	}
 
 	@OnEvent('url.accessed')
-	handleUrlAccessed(url: UrlEntity) {
-		const view = {
-			createdAt: new Date(),
-			url,
-		};
-		url.views.push(view);
+	async handleUrlAccessed(url: UrlEntity, ip?: string) {
+		url.views = url.views || [];
+		url.views.push(
+			this.viewRepository.create({
+				ip,
+				createdAt: new Date(),
+			}),
+		);
+		await this.urlRepository.save(url);
 	}
 }

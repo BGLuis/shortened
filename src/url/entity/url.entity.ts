@@ -2,27 +2,24 @@ import {
 	Column,
 	CreateDateColumn,
 	Entity,
-	Index,
-	OneToMany,
-	PrimaryGeneratedColumn,
+	ObjectIdColumn,
 	UpdateDateColumn,
 } from 'typeorm';
+import { ObjectId } from 'mongodb';
 import { ViewEntity } from './view.entity';
 
 @Entity()
 export class UrlEntity {
-	@PrimaryGeneratedColumn('uuid')
-	id: string;
+	@ObjectIdColumn()
+	id: ObjectId;
 
-	@Column({ length: 2048, unique: true })
-	@Index()
-	shortUrl: string;
-
-	@Column({ length: 2048 })
-	@Index()
+	@Column()
 	originalUrl: string;
 
-	@OneToMany(() => ViewEntity, (view) => view.url, { cascade: true })
+	@Column()
+	shortUrl: string;
+
+	@Column()
 	views: ViewEntity[];
 
 	@CreateDateColumn()

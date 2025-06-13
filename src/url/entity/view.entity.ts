@@ -1,8 +1,13 @@
-import { CreateDateColumn } from 'typeorm';
-import { UrlEntity } from './url.entity';
-
+import { ObjectId } from 'mongodb';
+import { Column, CreateDateColumn, Entity, ObjectIdColumn } from 'typeorm';
+@Entity()
 export class ViewEntity {
+	@ObjectIdColumn()
+	id: ObjectId;
+
 	@CreateDateColumn()
 	createdAt: Date;
-	url: UrlEntity;
+
+	@Column()
+	ip: string;
 }

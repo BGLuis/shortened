@@ -6,6 +6,8 @@ import {
 	Param,
 	Patch,
 	Post,
+	Redirect,
+	Req,
 } from '@nestjs/common';
 import { UrlService } from './url.service';
 import { CreateUrlDto } from './dto/create-url.dto';
@@ -20,9 +22,9 @@ export class UrlController {
 		return this.urlService.getAllUrls();
 	}
 
-	@Get(':id')
-	async getUrlById(@Param('id') id: string) {
-		return this.urlService.getUrlById(id);
+	@Get(':shortUrl')
+	async getUrlByShortUrl(@Param('shortUrl') shortUrl: string) {
+		return this.urlService.getUrlByShortUrl(shortUrl);
 	}
 
 	@Post()
@@ -30,14 +32,23 @@ export class UrlController {
 		return this.urlService.create(dto);
 	}
 
-	@Patch(':id')
-	async updateUrl(@Param('id') id: string, @Body() dto: UpdateUrlDto) {
-		return this.urlService.update(id, dto);
+	@Patch(':shortUrl')
+	async updateUrl(
+		@Param('shortUrl') shortUrl: string,
+		@Body() dto: UpdateUrlDto,
+	) {
+		return this.urlService.update(shortUrl, dto);
 	}
 
 	@Get('short/:shortUrl')
-	async getShortUrl(@Param('shortUrl') shortUrl: string) {
-		return this.urlService.getShortUrl(shortUrl);
+	@Redirect()
+	async getShortUrl(@Param('shortUrl') shortUrl: string, @Req() req) {
+		const ip =
+			req.ip ||
+			req.headers['x-forwarded-for'] ||
+			req.connection.remoteAddress;
+		const originalUrl = await this.urlService.getShortUrl(shortUrl, ip);
+		return { url: originalUrl, statusCode: 302 };
 	}
 
 	@Delete(':id')
