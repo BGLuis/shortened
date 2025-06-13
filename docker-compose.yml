@@ -1,0 +1,32 @@
+
+services:
+  api:
+    build:
+      context: ./
+    ports:
+      - "${PORT}:3000"
+    environment:
+      - DB_PORT=${DB_INTERNAL_PORT}
+    volumes:
+      - ./src:/app/src
+      - ./package.json:/app/package.json
+      - .env:/app/.env
+    depends_on:
+      - database
+
+  database:
+    image: mongo:latest
+    container_name: mongo_db
+    environment:
+      # - MONGO_INITDB_ROOT_USERNAME=${DB_USER}
+      # - MONGO_INITDB_ROOT_PASSWORD=${DB_PASS}
+      - MONGO_INITDB_DATABASE=${DB_NAME}
+      - MONGO_INITDB_PORT=${DB_INTERNAL_PORT}
+    ports:
+      - "${DB_EXTERNAL_PORT}:${DB_INTERNAL_PORT}"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
+    driver: local
