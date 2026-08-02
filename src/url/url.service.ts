@@ -6,6 +6,10 @@ import { Repository } from 'typeorm';
 import { UpdateUrlDto } from './dto/update-url.dto';
 import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
 import { ViewEntity } from './entity/view.entity';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { ClientProxy } from '@nestjs/microservices';
+import { Inject } from '@nestjs/common';
 import { ObjectId } from 'mongodb';
 
 @Injectable()
@@ -16,22 +20,29 @@ export class UrlService {
 		@InjectRepository(ViewEntity)
 		private readonly viewRepository: Repository<ViewEntity>,
 		private readonly eventEmitter: EventEmitter2,
+		@Inject(CACHE_MANAGER) private cacheManager: Cache,
+		@Inject('ANALYTICS_SERVICE') private analyticsClient: ClientProxy,
 	) {}
 
+	private kgsCounter = 1000000; // Simulação de um KGS Counter
+
 	async generateShortCode(length = 6) {
+		// Fase 2: Conversão matemática Base62 de um ID sequencial (KGS simulado)
+		this.kgsCounter++; 
+		let num = this.kgsCounter;
+		
 		const chars =
-			'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+			'0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 		let result = '';
-		for (let i = 0; i < length; i++) {
-			result += chars.charAt(Math.floor(Math.random() * chars.length));
+		while (num > 0) {
+			result = chars[num % 62] + result;
+			num = Math.floor(num / 62);
+		}
+		
+		while (result.length < length) {
+			result = chars[0] + result;
 		}
 
-		const findshort = await this.urlRepository.findOne({
-			where: { shortUrl: result },
-		});
-		if (findshort) {
-			return this.generateShortCode(length);
-		}
 		return result;
 	}
 
@@ -58,15 +69,29 @@ export class UrlService {
 	}
 
 	async getShortUrl(shortUrl: string, ip?: string) {
-		const url = await this.urlRepository.findOne({
-			where: { shortUrl },
-		});
-		if (!url) {
-			throw new BadRequestException('Short URL not found');
+		// Fase 3: Cache-Aside com Redis
+		const cachedOriginalUrl = await this.cacheManager.get<string>(shortUrl);
+		let originalUrl = cachedOriginalUrl;
+
+		if (!originalUrl) {
+			const url = await this.urlRepository.findOne({
+				where: { shortUrl },
+			});
+			if (!url) {
+				throw new BadRequestException('Short URL not found');
+			}
+			originalUrl = url.originalUrl;
+			// Salva no cache com TTL (e.g. 1 hora = 3600000ms)
+			await this.cacheManager.set(shortUrl, originalUrl, 3600000);
 		}
 
-		this.eventEmitter.emit('url.accessed', url, ip);
-		return url.originalUrl;
+		// Fase 4: Envio para Fila RabbitMQ (Analytics Assíncrono)
+		this.analyticsClient.emit('url.clicked', { urlId: shortUrl, ip, timestamp: new Date() });
+		
+		// Mantido evento local para compatibilidade enquanto worker não existe
+		this.eventEmitter.emit('url.accessed', shortUrl, ip);
+
+		return originalUrl;
 	}
 	async update(id: string, dto: UpdateUrlDto) {
 		const url = await this.urlRepository.findOne({
@@ -87,7 +112,6 @@ export class UrlService {
 		}
 
 		this.urlRepository.merge(url, dto);
-		delete url.views;
 		return this.urlRepository.save(url);
 	}
 	async delete(id: string) {
@@ -111,10 +135,13 @@ export class UrlService {
 		if (!url) {
 			throw new BadRequestException('URL not found');
 		}
+		
+		const views = await this.viewRepository.find({ where: { urlId: url.id.toString() } });
+		
 		const newUrl = {
 			...url,
-			views: url.views.length || 0,
-			viewsUniqui: url.views.reduce((acc, view) => {
+			views: views.length || 0,
+			viewsUniqui: views.reduce((acc, view) => {
 				if (!acc.includes(view.ip)) {
 					acc.push(view.ip);
 				}
@@ -125,14 +152,17 @@ export class UrlService {
 	}
 
 	@OnEvent('url.accessed')
-	async handleUrlAccessed(url: UrlEntity, ip?: string) {
-		url.views = url.views || [];
-		url.views.push(
-			this.viewRepository.create({
+	async handleUrlAccessed(shortUrl: string, ip?: string) {
+		const url = await this.urlRepository.findOne({
+			where: { shortUrl },
+		});
+		if (url) {
+			const view = this.viewRepository.create({
+				urlId: url.id.toString(),
 				ip,
 				createdAt: new Date(),
-			}),
-		);
-		await this.urlRepository.save(url);
+			});
+			await this.viewRepository.save(view);
+		}
 	}
 }

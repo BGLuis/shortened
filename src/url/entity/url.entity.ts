@@ -6,7 +6,6 @@ import {
 	UpdateDateColumn,
 } from 'typeorm';
 import { ObjectId } from 'mongodb';
-import { ViewEntity } from './view.entity';
 
 @Entity()
 export class UrlEntity {
@@ -18,9 +17,6 @@ export class UrlEntity {
 
 	@Column()
 	shortUrl: string;
-
-	@Column()
-	views: ViewEntity[];
 
 	@CreateDateColumn()
 	createdAt: Date;

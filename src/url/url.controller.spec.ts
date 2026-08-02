@@ -5,10 +5,17 @@ import { UrlService } from './url.service';
 describe('UrlController', () => {
 	let controller: UrlController;
 
+	const mockUrlService = {
+		create: jest.fn(),
+		getShortUrl: jest.fn(),
+	};
+
 	beforeEach(async () => {
 		const module: TestingModule = await Test.createTestingModule({
 			controllers: [UrlController],
-			providers: [UrlService],
+			providers: [
+				{ provide: UrlService, useValue: mockUrlService },
+			],
 		}).compile();
 
 		controller = module.get<UrlController>(UrlController);

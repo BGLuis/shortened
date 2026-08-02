@@ -27,6 +27,30 @@ services:
     volumes:
       - mongo_data:/data/db
 
+  redis:
+    image: redis:alpine
+    container_name: redis_cache
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq_broker
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  k6:
+    image: grafana/k6:latest
+    container_name: k6_load_test
+    environment:
+      - BASE_URL=http://api:3000
+    volumes:
+      - ./performance:/performance
+    command: run /performance/k6-test.js
+    depends_on:
+      - api
+
 volumes:
   mongo_data:
     driver: local
