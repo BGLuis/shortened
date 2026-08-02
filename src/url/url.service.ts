@@ -28,9 +28,9 @@ export class UrlService {
 
 	async generateShortCode(length = 6) {
 		// Fase 2: Conversão matemática Base62 de um ID sequencial (KGS simulado)
-		this.kgsCounter++; 
+		this.kgsCounter++;
 		let num = this.kgsCounter;
-		
+
 		const chars =
 			'0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 		let result = '';
@@ -38,7 +38,7 @@ export class UrlService {
 			result = chars[num % 62] + result;
 			num = Math.floor(num / 62);
 		}
-		
+
 		while (result.length < length) {
 			result = chars[0] + result;
 		}
@@ -86,8 +86,12 @@ export class UrlService {
 		}
 
 		// Fase 4: Envio para Fila RabbitMQ (Analytics Assíncrono)
-		this.analyticsClient.emit('url.clicked', { urlId: shortUrl, ip, timestamp: new Date() });
-		
+		this.analyticsClient.emit('url.clicked', {
+			urlId: shortUrl,
+			ip,
+			timestamp: new Date(),
+		});
+
 		// Mantido evento local para compatibilidade enquanto worker não existe
 		this.eventEmitter.emit('url.accessed', shortUrl, ip);
 
@@ -135,9 +139,11 @@ export class UrlService {
 		if (!url) {
 			throw new BadRequestException('URL not found');
 		}
-		
-		const views = await this.viewRepository.find({ where: { urlId: url.id.toString() } });
-		
+
+		const views = await this.viewRepository.find({
+			where: { urlId: url.id.toString() },
+		});
+
 		const newUrl = {
 			...url,
 			views: views.length || 0,

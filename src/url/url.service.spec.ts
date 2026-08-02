@@ -33,8 +33,14 @@ describe('UrlService', () => {
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				UrlService,
-				{ provide: getRepositoryToken(UrlEntity), useValue: mockUrlRepository },
-				{ provide: getRepositoryToken(ViewEntity), useValue: mockViewRepository },
+				{
+					provide: getRepositoryToken(UrlEntity),
+					useValue: mockUrlRepository,
+				},
+				{
+					provide: getRepositoryToken(ViewEntity),
+					useValue: mockViewRepository,
+				},
 				{ provide: EventEmitter2, useValue: mockEventEmitter },
 				{ provide: CACHE_MANAGER, useValue: mockCacheManager },
 				{ provide: 'ANALYTICS_SERVICE', useValue: mockAnalyticsClient },

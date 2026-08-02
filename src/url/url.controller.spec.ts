@@ -13,9 +13,7 @@ describe('UrlController', () => {
 	beforeEach(async () => {
 		const module: TestingModule = await Test.createTestingModule({
 			controllers: [UrlController],
-			providers: [
-				{ provide: UrlService, useValue: mockUrlService },
-			],
+			providers: [{ provide: UrlService, useValue: mockUrlService }],
 		}).compile();
 
 		controller = module.get<UrlController>(UrlController);

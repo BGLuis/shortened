@@ -8,11 +8,13 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
 	imports: [
 		UrlModule,
 		DatabaseModule,
+		AnalyticsModule,
 		EventEmitterModule.forRoot(),
 		CacheModule.registerAsync({
 			isGlobal: true,
@@ -25,10 +27,12 @@ import { APP_GUARD } from '@nestjs/core';
 				}),
 			}),
 		}),
-		ThrottlerModule.forRoot([{
-			ttl: 60000,
-			limit: 100, // Máximo de 100 requisições por minuto (Token Bucket)
-		}]),
+		ThrottlerModule.forRoot([
+			{
+				ttl: 60000,
+				limit: 100, // Máximo de 100 requisições por minuto (Token Bucket)
+			},
+		]),
 	],
 	controllers: [AppController],
 	providers: [
